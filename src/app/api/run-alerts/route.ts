@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { Resend } from 'resend'
 
+const resend = new Resend(process.env.RESEND_API_KEY)
 const TZ = 'America/Sao_Paulo'
 
 function getTodayInSaoPaulo() {
@@ -54,10 +56,15 @@ export async function GET(request: NextRequest) {
     .neq('status', 'done')
 
   if (tasksError) {
-    return NextResponse.json({ error: tasksError.message }, { status: 500 })
+    return NextResponse.json(
+      { error: tasksError.message },
+      { status: 500 }
+    )
   }
 
   let createdLogs = 0
+  let sentEmails = 0
+  const errors: string[] = []
 
   for (const task of tasks || []) {
     const dueToday = task.start_date === today
@@ -90,30 +97,107 @@ export async function GET(request: NextRequest) {
       .eq('scheduled_for', scheduledFor)
       .maybeSingle()
 
-    if (existingLog) {
+    if (!existingLog) {
+      const { error: insertError } = await supabase
+        .from('notification_logs')
+        .insert({
+          task_id: task.id,
+          user_id: task.user_id,
+          channel,
+          status: 'sent',
+          message,
+          scheduled_for: scheduledFor,
+          sent_at: new Date().toISOString(),
+        })
+
+      if (!insertError) {
+        createdLogs += 1
+      }
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', task.user_id)
+      .maybeSingle()
+
+    if (!profile?.email) {
+      errors.push(`Usuário ${task.user_id} sem email no profile.`)
       continue
     }
 
-    const { error: insertError } = await supabase
+    const emailChannel = 'email'
+
+    const { data: existingEmailLog } = await supabase
       .from('notification_logs')
-      .insert({
+      .select('id')
+      .eq('task_id', task.id)
+      .eq('user_id', task.user_id)
+      .eq('channel', emailChannel)
+      .eq('scheduled_for', scheduledFor)
+      .maybeSingle()
+
+    if (existingEmailLog) {
+      continue
+    }
+
+    const subject = dueToday
+      ? `TaskOps: "${task.title}" vence hoje`
+      : `TaskOps: lembrete da tarefa "${task.title}"`
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Olá${profile.full_name ? `, ${profile.full_name}` : ''}</h2>
+        <p>${message}</p>
+        <p><strong>Tarefa:</strong> ${task.title}</p>
+        <p><strong>Data:</strong> ${task.start_date}</p>
+        <p><strong>Status:</strong> ${task.status}</p>
+        <hr />
+        <p>Este email foi enviado automaticamente pelo TaskOps.</p>
+      </div>
+    `
+
+    const { error: emailError } = await resend.emails.send({
+      from: 'TaskOps <onboarding@resend.dev>',
+      to: profile.email,
+      subject,
+      html,
+    })
+
+    if (emailError) {
+      errors.push(`Erro ao enviar email para ${profile.email}: ${emailError.message}`)
+
+      await supabase.from('notification_logs').insert({
         task_id: task.id,
         user_id: task.user_id,
-        channel,
-        status: 'sent',
-        message,
+        channel: emailChannel,
+        status: 'failed',
+        message: `Falha ao enviar email: ${message}`,
         scheduled_for: scheduledFor,
-        sent_at: new Date().toISOString(),
+        error_message: emailError.message,
       })
 
-    if (!insertError) {
-      createdLogs += 1
+      continue
     }
+
+    await supabase.from('notification_logs').insert({
+      task_id: task.id,
+      user_id: task.user_id,
+      channel: emailChannel,
+      status: 'sent',
+      message: `Email enviado: ${message}`,
+      scheduled_for: scheduledFor,
+      sent_at: new Date().toISOString(),
+    })
+
+    sentEmails += 1
   }
 
   return NextResponse.json({
     success: true,
     today,
     createdLogs,
+    sentEmails,
+    errors,
   })
 }
