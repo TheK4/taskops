@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
 
     const { error: emailError } = await resend.emails.send({
       from: 'TaskOps <onboarding@resend.dev>',
-      to: profile.email,
+      to: 'talesaknauer@gmail.com',
       subject,
       html,
     })
