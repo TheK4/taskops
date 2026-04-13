@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const TZ = 'America/Sao_Paulo'
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const today = getTodayInSaoPaulo()
 
   const { data: tasks, error: tasksError } = await supabase
@@ -81,65 +81,73 @@ export async function GET(request: NextRequest) {
       continue
     }
 
-    const channel = 'in_app'
-    const message = dueToday
+    const scheduledFor = `${today}T00:00:00`
+
+    const inAppMessage = dueToday
       ? `A tarefa "${task.title}" vence hoje.`
       : `Lembrete: a tarefa "${task.title}" está próxima do vencimento.`
 
-    const scheduledFor = `${today}T00:00:00`
-
-    const { data: existingLog } = await supabase
+    const { data: existingInAppLog } = await supabase
       .from('notification_logs')
       .select('id')
       .eq('task_id', task.id)
       .eq('user_id', task.user_id)
-      .eq('channel', channel)
+      .eq('channel', 'in_app')
       .eq('scheduled_for', scheduledFor)
       .maybeSingle()
 
-    if (!existingLog) {
-      const { error: insertError } = await supabase
+    if (!existingInAppLog) {
+      const { error: inAppInsertError } = await supabase
         .from('notification_logs')
         .insert({
           task_id: task.id,
           user_id: task.user_id,
-          channel,
+          channel: 'in_app',
           status: 'sent',
-          message,
+          message: inAppMessage,
           scheduled_for: scheduledFor,
           sent_at: new Date().toISOString(),
         })
 
-      if (!insertError) {
+      if (inAppInsertError) {
+        errors.push(`Erro log in_app ${task.title}: ${inAppInsertError.message}`)
+      } else {
         createdLogs += 1
       }
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('email, full_name')
       .eq('id', task.user_id)
       .maybeSingle()
+
+    if (profileError) {
+      errors.push(`Erro ao buscar profile ${task.user_id}: ${profileError.message}`)
+      continue
+    }
 
     if (!profile?.email) {
       errors.push(`Usuário ${task.user_id} sem email no profile.`)
       continue
     }
 
-    const emailChannel = 'email'
-
     const { data: existingEmailLog } = await supabase
       .from('notification_logs')
       .select('id')
       .eq('task_id', task.id)
       .eq('user_id', task.user_id)
-      .eq('channel', emailChannel)
+      .eq('channel', 'email')
       .eq('scheduled_for', scheduledFor)
       .maybeSingle()
 
     if (existingEmailLog) {
       continue
     }
+
+    const emailMessage = dueToday
+      ? `A tarefa "${task.title}" vence hoje.`
+      : `Lembrete: a tarefa "${task.title}" está próxima do vencimento.`
 
     const subject = dueToday
       ? `TaskOps: "${task.title}" vence hoje`
@@ -148,7 +156,7 @@ export async function GET(request: NextRequest) {
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Olá${profile.full_name ? `, ${profile.full_name}` : ''}</h2>
-        <p>${message}</p>
+        <p>${emailMessage}</p>
         <p><strong>Tarefa:</strong> ${task.title}</p>
         <p><strong>Data:</strong> ${task.start_date}</p>
         <p><strong>Status:</strong> ${task.status}</p>
@@ -170,9 +178,9 @@ export async function GET(request: NextRequest) {
       await supabase.from('notification_logs').insert({
         task_id: task.id,
         user_id: task.user_id,
-        channel: emailChannel,
+        channel: 'email',
         status: 'failed',
-        message: `Falha ao enviar email: ${message}`,
+        message: `Falha ao enviar email: ${emailMessage}`,
         scheduled_for: scheduledFor,
         error_message: emailError.message,
       })
@@ -183,9 +191,9 @@ export async function GET(request: NextRequest) {
     await supabase.from('notification_logs').insert({
       task_id: task.id,
       user_id: task.user_id,
-      channel: emailChannel,
+      channel: 'email',
       status: 'sent',
-      message: `Email enviado: ${message}`,
+      message: `Email enviado: ${emailMessage}`,
       scheduled_for: scheduledFor,
       sent_at: new Date().toISOString(),
     })
@@ -196,6 +204,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     today,
+    tasksFound: tasks?.length || 0,
     createdLogs,
     sentEmails,
     errors,
