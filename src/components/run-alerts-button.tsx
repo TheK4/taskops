@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { runAlertsManually } from '@/app/dashboard/actions'
 
 export default function RunAlertsButton() {
   const [loading, setLoading] = useState(false)
@@ -11,17 +12,14 @@ export default function RunAlertsButton() {
     try {
       setLoading(true)
 
-      const response = await fetch('/api/run-alerts', {
-        method: 'GET',
-      })
-
-      const data = await response.json()
+      const data = await runAlertsManually()
 
       console.log('Resultado da varredura:', data)
 
       router.refresh()
     } catch (error) {
       console.error('Erro ao executar alertas:', error)
+      alert('Erro ao executar varredura de alertas.')
     } finally {
       setLoading(false)
     }
