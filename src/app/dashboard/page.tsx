@@ -51,17 +51,48 @@ export default async function DashboardPage() {
 
   const today = getTodayInSaoPaulo()
 
-  const { data: tasks } = await supabase
-    .from('tasks')
+  const { data: profile } = await supabase
+    .from('profiles')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('id', user.id)
+    .maybeSingle()
 
-  const { data: logs } = await supabase
+  const isManagerView =
+    profile?.role === 'admin' || profile?.role === 'manager'
+
+  const tasksQuery = supabase.from('tasks').select('*')
+
+  const profilesQuery = supabase.from('profiles').select('id, full_name, email, role')
+
+  const logsQuery = supabase
     .from('notification_logs')
     .select('*')
-    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(10)
+
+  const { data: allProfiles } = isManagerView
+    ? await profilesQuery
+    : await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .eq('id', user.id)
+
+  const { data: tasks } = isManagerView
+    ? await tasksQuery.order('created_at', { ascending: false })
+    : await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+  const { data: logs } = isManagerView
+    ? await logsQuery
+    : await supabase
+        .from('notification_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
 
   const activeTasks = (tasks || []).filter((t) => t.status !== 'done')
 
@@ -76,18 +107,54 @@ export default async function DashboardPage() {
     return alertDate === today
   })
 
+  const totalTasks = (tasks || []).length
+  const pendingTasksCount = (tasks || []).filter((t) => t.status === 'pending').length
+  const overdueTasksCount = (tasks || []).filter((t) => t.status === 'overdue').length
+  const doneTasksCount = (tasks || []).filter((t) => t.status === 'done').length
+
+  function getUserLabel(userId: string) {
+    const found = (allProfiles || []).find((p) => p.id === userId)
+    if (!found) return 'Usuário'
+    return found.full_name || found.email || 'Usuário'
+  }
+
   return (
     <main className="min-h-screen p-6">
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex items-center justify-between rounded-2xl border p-6">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
             <p className="text-zinc-600">
-              Bem-vindo, {user.email}
+              Bem-vindo, {profile?.full_name || user.email}
+            </p>
+            <p className="text-sm text-zinc-500 mt-1">
+              Perfil: {profile?.role || 'member'}
             </p>
           </div>
 
           <LogoutButton />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border p-4">
+            <p className="text-sm text-zinc-500">Total</p>
+            <p className="text-2xl font-bold">{totalTasks}</p>
+          </div>
+
+          <div className="rounded-2xl border p-4">
+            <p className="text-sm text-zinc-500">Pendentes</p>
+            <p className="text-2xl font-bold text-yellow-600">{pendingTasksCount}</p>
+          </div>
+
+          <div className="rounded-2xl border p-4">
+            <p className="text-sm text-zinc-500">Atrasadas</p>
+            <p className="text-2xl font-bold text-red-600">{overdueTasksCount}</p>
+          </div>
+
+          <div className="rounded-2xl border p-4">
+            <p className="text-sm text-zinc-500">Concluídas</p>
+            <p className="text-2xl font-bold text-green-600">{doneTasksCount}</p>
+          </div>
         </div>
 
         <div className="rounded-2xl border p-6 space-y-4">
@@ -114,7 +181,7 @@ export default async function DashboardPage() {
                   <ul className="text-sm text-zinc-700 mt-1 space-y-1">
                     {dueTodayTasks.map((task) => (
                       <li key={task.id}>
-                        • {task.title}
+                        • {task.title} {isManagerView ? `— ${getUserLabel(task.user_id)}` : ''}
                       </li>
                     ))}
                   </ul>
@@ -128,6 +195,7 @@ export default async function DashboardPage() {
                     {alertTodayTasks.map((task) => (
                       <li key={task.id}>
                         • {task.title} — vence em {minutesToDays(task.remind_offset_minutes)} dia(s)
+                        {isManagerView ? ` — ${getUserLabel(task.user_id)}` : ''}
                       </li>
                     ))}
                   </ul>
@@ -142,6 +210,51 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        {isManagerView && (
+          <div className="rounded-2xl border p-6">
+            <h2 className="text-xl font-semibold mb-4">Visão da equipe</h2>
+
+            {tasks && tasks.length > 0 ? (
+              <div className="space-y-3">
+                {tasks.slice(0, 12).map((task) => (
+                  <div key={task.id} className="rounded-xl border p-4">
+                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-medium">{task.title}</p>
+                        <p className="text-sm text-zinc-600">
+                          {getUserLabel(task.user_id)}
+                        </p>
+                      </div>
+
+                      <div className="text-sm text-zinc-500">
+                        {task.start_date}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 text-sm">
+                      <span
+                        className={
+                          task.status === 'done'
+                            ? 'text-green-600'
+                            : task.status === 'overdue'
+                            ? 'text-red-600'
+                            : 'text-yellow-600'
+                        }
+                      >
+                        {task.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-zinc-600">
+                Nenhuma tarefa encontrada.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="rounded-2xl border p-6">
           <h2 className="text-xl font-semibold mb-4">Últimos alertas gerados</h2>
