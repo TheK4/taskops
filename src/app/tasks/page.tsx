@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { createTask, completeTask } from './actions'
+import { createTask, completeTask, deleteTask } from './actions'
 
 type SearchParams = Promise<{
   status?: string
@@ -155,7 +155,6 @@ export default async function TasksPage({
   const { data: tasks } = await query
 
   const activeTasks = (tasks || []).filter((task) => task.status !== 'done')
-
   const dueTodayTasks = activeTasks.filter((task) => task.start_date === today)
 
   const alertTodayTasks = activeTasks.filter((task) => {
@@ -196,35 +195,24 @@ export default async function TasksPage({
 
         <div className="rounded-xl border border-yellow-300 bg-yellow-50 p-4 space-y-3">
           <h2 className="text-lg font-semibold">Alertas de hoje</h2>
-
-          <div className="text-xs text-zinc-600">
-            Hoje: {today}
-          </div>
+          <div className="text-xs text-zinc-600">Hoje: {today}</div>
 
           {dueTodayTasks.length > 0 ? (
             <div>
-              <p className="text-sm font-medium text-zinc-800">
-                Vencem hoje:
-              </p>
+              <p className="text-sm font-medium text-zinc-800">Vencem hoje:</p>
               <ul className="mt-1 text-sm text-zinc-700 space-y-1">
                 {dueTodayTasks.map((task) => (
-                  <li key={`due-${task.id}`}>
-                    • {task.title} — vence hoje
-                  </li>
+                  <li key={`due-${task.id}`}>• {task.title} — vence hoje</li>
                 ))}
               </ul>
             </div>
           ) : (
-            <p className="text-sm text-zinc-600">
-              Nenhuma tarefa vence hoje.
-            </p>
+            <p className="text-sm text-zinc-600">Nenhuma tarefa vence hoje.</p>
           )}
 
           {alertTodayTasks.length > 0 ? (
             <div>
-              <p className="text-sm font-medium text-zinc-800">
-                Avisos para hoje:
-              </p>
+              <p className="text-sm font-medium text-zinc-800">Avisos para hoje:</p>
               <ul className="mt-1 text-sm text-zinc-700 space-y-1">
                 {alertTodayTasks.map((task) => (
                   <li key={`alert-${task.id}`}>
@@ -234,9 +222,7 @@ export default async function TasksPage({
               </ul>
             </div>
           ) : (
-            <p className="text-sm text-zinc-600">
-              Nenhum aviso para hoje.
-            </p>
+            <p className="text-sm text-zinc-600">Nenhum aviso para hoje.</p>
           )}
         </div>
 
@@ -261,10 +247,7 @@ export default async function TasksPage({
             className="w-full border px-3 py-2 rounded"
           />
 
-          <select
-            name="recurrence"
-            className="w-full border px-3 py-2 rounded"
-          >
+          <select name="recurrence" className="w-full border px-3 py-2 rounded">
             <option value="none">Sem recorrência</option>
             <option value="daily">Diária</option>
             <option value="weekly">Semanal</option>
@@ -303,73 +286,95 @@ export default async function TasksPage({
         <div className="space-y-3">
           {tasks && tasks.length > 0 ? (
             tasks.map((task) => (
-              <form
+              <div
                 key={task.id}
-                action={async () => {
-                  'use server'
-                  await completeTask(task.id)
-                }}
+                className="border p-4 rounded-xl flex justify-between items-center gap-4"
               >
-                <div className="border p-4 rounded-xl flex justify-between items-center">
-                  <div>
-                    <p
-                      className={`font-semibold ${
-                        task.status === 'done'
-                          ? 'line-through text-zinc-400'
-                          : task.status === 'overdue'
-                          ? 'text-red-600'
-                          : ''
-                      }`}
-                    >
-                      {task.title}
-                    </p>
+                <div className="flex-1">
+                  <p
+                    className={`font-semibold ${
+                      task.status === 'done'
+                        ? 'line-through text-zinc-400'
+                        : task.status === 'overdue'
+                        ? 'text-red-600'
+                        : ''
+                    }`}
+                  >
+                    {task.title}
+                  </p>
 
-                    <p className="text-sm text-zinc-600">{task.description}</p>
+                  <p className="text-sm text-zinc-600">{task.description}</p>
 
-                    <div className="mt-1 flex flex-wrap gap-3 text-xs text-zinc-500">
-                      <span>Data: {task.start_date}</span>
-                      <span>
-                        Recorrência:{' '}
-                        {task.recurrence_type === 'none'
-                          ? 'Sem recorrência'
-                          : task.recurrence_type === 'daily'
-                          ? 'Diária'
-                          : task.recurrence_type === 'weekly'
-                          ? 'Semanal'
-                          : 'Mensal'}
-                      </span>
-                      {task.recurrence_day_of_month && (
-                        <span>Dia fixo: {task.recurrence_day_of_month}</span>
-                      )}
-                      {minutesToDays(task.remind_offset_minutes) && (
-                        <span>
-                          Aviso: {minutesToDays(task.remind_offset_minutes)} dia(s) antes
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`text-sm font-medium ${
-                        task.status === 'done'
-                          ? 'text-green-600'
-                          : task.status === 'overdue'
-                          ? 'text-red-600'
-                          : 'text-yellow-600'
-                      }`}
-                    >
-                      {task.status}
+                  <div className="mt-1 flex flex-wrap gap-3 text-xs text-zinc-500">
+                    <span>Data: {task.start_date}</span>
+                    <span>
+                      Recorrência:{' '}
+                      {task.recurrence_type === 'none'
+                        ? 'Sem recorrência'
+                        : task.recurrence_type === 'daily'
+                        ? 'Diária'
+                        : task.recurrence_type === 'weekly'
+                        ? 'Semanal'
+                        : 'Mensal'}
                     </span>
-
-                    {task.status !== 'done' && (
-                      <button className="bg-green-600 text-white px-3 py-1 rounded">
-                        Concluir
-                      </button>
+                    {task.recurrence_day_of_month && (
+                      <span>Dia fixo: {task.recurrence_day_of_month}</span>
+                    )}
+                    {minutesToDays(task.remind_offset_minutes) && (
+                      <span>
+                        Aviso: {minutesToDays(task.remind_offset_minutes)} dia(s) antes
+                      </span>
                     )}
                   </div>
                 </div>
-              </form>
+
+                <div className="flex flex-col items-end gap-2">
+                  <span
+                    className={`text-sm font-medium ${
+                      task.status === 'done'
+                        ? 'text-green-600'
+                        : task.status === 'overdue'
+                        ? 'text-red-600'
+                        : 'text-yellow-600'
+                    }`}
+                  >
+                    {task.status}
+                  </span>
+
+                  <div className="flex gap-2">
+                    {task.status !== 'done' && (
+                      <form
+                        action={async () => {
+                          'use server'
+                          await completeTask(task.id)
+                        }}
+                      >
+                        <button className="bg-green-600 text-white px-3 py-1 rounded">
+                          Concluir
+                        </button>
+                      </form>
+                    )}
+
+                    <Link
+                      href={`/tasks/${task.id}/edit`}
+                      className="border px-3 py-1 rounded"
+                    >
+                      Editar
+                    </Link>
+
+                    <form
+                      action={async () => {
+                        'use server'
+                        await deleteTask(task.id)
+                      }}
+                    >
+                      <button className="bg-red-600 text-white px-3 py-1 rounded">
+                        Excluir
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
             ))
           ) : (
             <div className="border rounded-xl p-6 text-center text-zinc-500">

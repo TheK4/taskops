@@ -41,6 +41,7 @@ export async function createTask(formData: FormData) {
   }
 
   revalidatePath('/tasks')
+  revalidatePath('/dashboard')
   redirect('/tasks')
 }
 
@@ -57,4 +58,57 @@ export async function completeTask(taskId: string) {
   }
 
   revalidatePath('/tasks')
+  revalidatePath('/dashboard')
+}
+
+export async function deleteTask(taskId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', taskId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/tasks')
+  revalidatePath('/dashboard')
+}
+
+export async function updateTask(taskId: string, formData: FormData) {
+  const supabase = await createClient()
+
+  const title = String(formData.get('title') || '')
+  const description = String(formData.get('description') || '')
+  const dueDate = String(formData.get('due_date') || '')
+  const recurrence = String(formData.get('recurrence') || 'none')
+  const dayOfMonth = Number(formData.get('day_of_month') || 0)
+  const remindDaysBefore = Number(formData.get('remind_days_before') || 0)
+  const status = String(formData.get('status') || 'pending')
+
+  const remindOffsetMinutes =
+    remindDaysBefore > 0 ? remindDaysBefore * 24 * 60 : 0
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      title,
+      description,
+      start_date: dueDate,
+      recurrence_type: recurrence,
+      recurrence_day_of_month: dayOfMonth || null,
+      remind_offset_minutes: remindOffsetMinutes,
+      status,
+    })
+    .eq('id', taskId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/tasks')
+  revalidatePath('/dashboard')
+  redirect('/tasks')
 }
