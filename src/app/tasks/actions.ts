@@ -106,6 +106,10 @@ export async function deleteTask(taskId: string) {
     .eq('id', taskId)
     .maybeSingle()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   const { error } = await supabase
     .from('tasks')
     .delete()
@@ -115,14 +119,10 @@ export async function deleteTask(taskId: string) {
     throw new Error(error.message)
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
   if (user) {
     await supabase.from('activity_logs').insert({
       user_id: user.id,
-      task_id: taskId,
+      task_id: null,
       action: 'delete',
       description: `Excluiu tarefa "${task?.title || ''}"`,
     })
