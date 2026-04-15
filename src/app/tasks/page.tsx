@@ -70,6 +70,22 @@ export default async function TasksPage({
     return null
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isManagerView =
+    profile?.role === 'admin' || profile?.role === 'manager'
+
+  const { data: teamProfiles } = isManagerView
+    ? await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .order('full_name', { ascending: true })
+    : { data: [] }
+
   const today = getTodayInSaoPaulo()
 
   await supabase
@@ -168,21 +184,6 @@ export default async function TasksPage({
     return alertDate === today
   })
 
-  function filterLink(status: string, label: string) {
-    const isActive = currentStatus === status
-
-    return (
-      <Link
-        href={`/tasks?status=${status}`}
-        className={`rounded-lg px-3 py-2 text-sm border ${
-          isActive ? 'bg-black text-white border-black' : 'bg-white text-black'
-        }`}
-      >
-        {label}
-      </Link>
-    )
-  }
-
   return (
     <main className="min-h-screen p-6">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -227,6 +228,20 @@ export default async function TasksPage({
         </div>
 
         <form action={createTask} className="space-y-4 border p-4 rounded-xl">
+          {isManagerView && (
+            <select
+              name="assigned_user_id"
+              defaultValue={user.id}
+              className="w-full border px-3 py-2 rounded"
+            >
+              {(teamProfiles || []).map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.full_name || member.email} {member.role ? `(${member.role})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
           <input
             name="title"
             placeholder="Nome da tarefa"
@@ -277,10 +292,41 @@ export default async function TasksPage({
         </form>
 
         <div className="flex flex-wrap gap-2">
-          {filterLink('all', 'Todas')}
-          {filterLink('pending', 'Pendentes')}
-          {filterLink('done', 'Concluídas')}
-          {filterLink('overdue', 'Atrasadas')}
+          <Link
+            href="/tasks?status=all"
+            className={`rounded-lg px-3 py-2 text-sm border ${
+              currentStatus === 'all' ? 'bg-black text-white border-black' : 'bg-white text-black'
+            }`}
+          >
+            Todas
+          </Link>
+
+          <Link
+            href="/tasks?status=pending"
+            className={`rounded-lg px-3 py-2 text-sm border ${
+              currentStatus === 'pending' ? 'bg-black text-white border-black' : 'bg-white text-black'
+            }`}
+          >
+            Pendentes
+          </Link>
+
+          <Link
+            href="/tasks?status=done"
+            className={`rounded-lg px-3 py-2 text-sm border ${
+              currentStatus === 'done' ? 'bg-black text-white border-black' : 'bg-white text-black'
+            }`}
+          >
+            Concluídas
+          </Link>
+
+          <Link
+            href="/tasks?status=overdue"
+            className={`rounded-lg px-3 py-2 text-sm border ${
+              currentStatus === 'overdue' ? 'bg-black text-white border-black' : 'bg-white text-black'
+            }`}
+          >
+            Atrasadas
+          </Link>
         </div>
 
         <div className="space-y-3">

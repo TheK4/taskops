@@ -15,6 +15,18 @@ export async function createTask(formData: FormData) {
     redirect('/login')
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isManagerView =
+    profile?.role === 'admin' || profile?.role === 'manager'
+
+  const assignedUserId = String(formData.get('assigned_user_id') || '')
+  const targetUserId = isManagerView && assignedUserId ? assignedUserId : user.id
+
   const title = String(formData.get('title') || '')
   const description = String(formData.get('description') || '')
   const dueDate = String(formData.get('due_date') || '')
@@ -26,7 +38,7 @@ export async function createTask(formData: FormData) {
     remindDaysBefore > 0 ? remindDaysBefore * 24 * 60 : 0
 
   const { error } = await supabase.from('tasks').insert({
-    user_id: user.id,
+    user_id: targetUserId,
     title,
     description,
     start_date: dueDate,
