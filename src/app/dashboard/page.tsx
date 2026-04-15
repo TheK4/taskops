@@ -62,7 +62,9 @@ export default async function DashboardPage() {
 
   const tasksQuery = supabase.from('tasks').select('*')
 
-  const profilesQuery = supabase.from('profiles').select('id, full_name, email, role')
+  const profilesQuery = supabase
+    .from('profiles')
+    .select('id, full_name, email, role')
 
   const logsQuery = supabase
     .from('notification_logs')
@@ -94,18 +96,18 @@ export default async function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(10)
 
-    const { data: activityLogs } = isManagerView
-      ? await supabase
-          .from('activity_logs')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10)
-      : await supabase
-          .from('activity_logs')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10)
+  const { data: activityLogs } = isManagerView
+    ? await supabase
+        .from('activity_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10)
+    : await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
 
   const activeTasks = (tasks || []).filter((t) => t.status !== 'done')
 
@@ -130,6 +132,25 @@ export default async function DashboardPage() {
     if (!found) return 'Usuário'
     return found.full_name || found.email || 'Usuário'
   }
+
+  const analytics = isManagerView
+    ? (allProfiles || []).map((person) => {
+        const userTasks = (tasks || []).filter((task) => task.user_id === person.id)
+
+        return {
+          id: person.id,
+          name: person.full_name || person.email || 'Usuário',
+          total: userTasks.length,
+          pending: userTasks.filter((task) => task.status === 'pending').length,
+          overdue: userTasks.filter((task) => task.status === 'overdue').length,
+          done: userTasks.filter((task) => task.status === 'done').length,
+        }
+      })
+    : []
+
+  const totalRanking = [...analytics].sort((a, b) => b.total - a.total)
+  const overdueRanking = [...analytics].sort((a, b) => b.overdue - a.overdue)
+  const doneRanking = [...analytics].sort((a, b) => b.done - a.done)
 
   return (
     <main className="min-h-screen p-6">
@@ -217,18 +238,79 @@ export default async function DashboardPage() {
             </div>
           )}
 
-        <div className="flex flex-wrap gap-4">
-          <Link href="/tasks" className="underline text-blue-600">
-            Ir para tarefas
-          </Link>
-
-          {profile?.role === 'admin' && (
-            <Link href="/dashboard/team" className="underline text-blue-600">
-              Gerenciar equipe
+          <div className="flex flex-wrap gap-4">
+            <Link href="/tasks" className="underline text-blue-600">
+              Ir para tarefas
             </Link>
-          )}
+
+            {profile?.role === 'admin' && (
+              <Link href="/dashboard/team" className="underline text-blue-600">
+                Gerenciar equipe
+              </Link>
+            )}
+          </div>
         </div>
-        </div>
+
+        {isManagerView && (
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border p-6">
+              <h2 className="text-xl font-semibold mb-4">Mais tarefas</h2>
+
+              {totalRanking.length > 0 ? (
+                <div className="space-y-3">
+                  {totalRanking.slice(0, 5).map((item) => (
+                    <div key={item.id} className="rounded-xl border p-4">
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-sm text-zinc-500 mt-1">
+                        Total: {item.total}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-zinc-600">Sem dados.</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border p-6">
+              <h2 className="text-xl font-semibold mb-4">Mais atrasos</h2>
+
+              {overdueRanking.length > 0 ? (
+                <div className="space-y-3">
+                  {overdueRanking.slice(0, 5).map((item) => (
+                    <div key={item.id} className="rounded-xl border p-4">
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-sm text-zinc-500 mt-1">
+                        Atrasadas: {item.overdue}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-zinc-600">Sem dados.</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border p-6">
+              <h2 className="text-xl font-semibold mb-4">Mais concluídas</h2>
+
+              {doneRanking.length > 0 ? (
+                <div className="space-y-3">
+                  {doneRanking.slice(0, 5).map((item) => (
+                    <div key={item.id} className="rounded-xl border p-4">
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-sm text-zinc-500 mt-1">
+                        Concluídas: {item.done}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-zinc-600">Sem dados.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {isManagerView && (
           <div className="rounded-2xl border p-6">
@@ -316,7 +398,6 @@ export default async function DashboardPage() {
             </p>
           )}
         </div>
-
       </div>
     </main>
   )
