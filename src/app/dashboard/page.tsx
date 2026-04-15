@@ -204,11 +204,17 @@ export default async function DashboardPage() {
             </div>
           )}
 
-          <div>
-            <Link href="/tasks" className="underline text-blue-600">
-              Ir para tarefas
+        <div className="flex flex-wrap gap-4">
+          <Link href="/tasks" className="underline text-blue-600">
+            Ir para tarefas
+          </Link>
+
+          {profile?.role === 'admin' && (
+            <Link href="/dashboard/team" className="underline text-blue-600">
+              Gerenciar equipe
             </Link>
-          </div>
+          )}
+        </div>
         </div>
 
         {isManagerView && (

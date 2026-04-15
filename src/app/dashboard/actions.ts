@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
 
 export async function runAlertsManually() {
   const baseUrl =
@@ -34,4 +35,42 @@ export async function runAlertsManually() {
   revalidatePath('/tasks')
 
   return data
+}
+
+export async function updateUserRole(userId: string, role: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Usuário não autenticado.')
+  }
+
+  const { data: currentProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (currentProfile?.role !== 'admin') {
+    throw new Error('Apenas admin pode alterar papéis.')
+  }
+
+  if (!['member', 'manager', 'admin'].includes(role)) {
+    throw new Error('Papel inválido.')
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role })
+    .eq('id', userId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/team')
 }
