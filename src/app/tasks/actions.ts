@@ -37,20 +37,31 @@ export async function createTask(formData: FormData) {
   const remindOffsetMinutes =
     remindDaysBefore > 0 ? remindDaysBefore * 24 * 60 : 0
 
-  const { error } = await supabase.from('tasks').insert({
-    user_id: targetUserId,
-    title,
-    description,
-    start_date: dueDate,
-    recurrence_type: recurrence,
-    recurrence_day_of_month: dayOfMonth || null,
-    remind_offset_minutes: remindOffsetMinutes,
-    status: 'pending',
-  })
+  const { data: insertedTask, error } = await supabase
+    .from('tasks')
+    .insert({
+      user_id: targetUserId,
+      title,
+      description,
+      start_date: dueDate,
+      recurrence_type: recurrence,
+      recurrence_day_of_month: dayOfMonth || null,
+      remind_offset_minutes: remindOffsetMinutes,
+      status: 'pending',
+    })
+    .select('id')
+    .single()
 
   if (error) {
     throw new Error(error.message)
   }
+
+  await supabase.from('activity_logs').insert({
+    user_id: user.id,
+    task_id: insertedTask.id,
+    action: 'create',
+    description: `Criou tarefa "${title}"`,
+  })
 
   revalidatePath('/tasks')
   revalidatePath('/dashboard')
@@ -69,12 +80,31 @@ export async function completeTask(taskId: string) {
     throw new Error(error.message)
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      user_id: user.id,
+      task_id: taskId,
+      action: 'complete',
+      description: 'Concluiu tarefa',
+    })
+  }
+
   revalidatePath('/tasks')
   revalidatePath('/dashboard')
 }
 
 export async function deleteTask(taskId: string) {
   const supabase = await createClient()
+
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('title')
+    .eq('id', taskId)
+    .maybeSingle()
 
   const { error } = await supabase
     .from('tasks')
@@ -83,6 +113,19 @@ export async function deleteTask(taskId: string) {
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      user_id: user.id,
+      task_id: taskId,
+      action: 'delete',
+      description: `Excluiu tarefa "${task?.title || ''}"`,
+    })
   }
 
   revalidatePath('/tasks')
@@ -118,6 +161,19 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    await supabase.from('activity_logs').insert({
+      user_id: user.id,
+      task_id: taskId,
+      action: 'update',
+      description: 'Atualizou tarefa',
+    })
   }
 
   revalidatePath('/tasks')

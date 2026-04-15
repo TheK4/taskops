@@ -94,6 +94,19 @@ export default async function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(10)
 
+    const { data: activityLogs } = isManagerView
+      ? await supabase
+          .from('activity_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10)
+      : await supabase
+          .from('activity_logs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
   const activeTasks = (tasks || []).filter((t) => t.status !== 'done')
 
   const dueTodayTasks = activeTasks.filter((t) => t.start_date === today)
@@ -282,6 +295,28 @@ export default async function DashboardPage() {
             </p>
           )}
         </div>
+
+        <div className="rounded-2xl border p-6">
+          <h2 className="text-xl font-semibold mb-4">Atividades recentes</h2>
+
+          {activityLogs && activityLogs.length > 0 ? (
+            <div className="space-y-3">
+              {activityLogs.map((log) => (
+                <div key={log.id} className="rounded-xl border p-4">
+                  <p className="font-medium">{log.description}</p>
+                  <p className="text-sm text-zinc-500 mt-1">
+                    {new Date(log.created_at).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-zinc-600">
+              Nenhuma atividade registrada.
+            </p>
+          )}
+        </div>
+
       </div>
     </main>
   )
