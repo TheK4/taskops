@@ -38,7 +38,20 @@ function minutesToDays(minutes: number | null) {
   return Math.floor(minutes / 1440)
 }
 
-export default async function DashboardPage() {
+type SearchParams = Promise<{
+  user?: string
+  status?: string
+}>
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) {
+  const params = await searchParams
+  const selectedUserId = params.user || 'all'
+  const selectedStatus = params.status || 'all'
+
   const supabase = await createClient()
 
   const {
@@ -60,17 +73,9 @@ export default async function DashboardPage() {
   const isManagerView =
     profile?.role === 'admin' || profile?.role === 'manager'
 
-  const tasksQuery = supabase.from('tasks').select('*')
-
   const profilesQuery = supabase
     .from('profiles')
     .select('id, full_name, email, role')
-
-  const logsQuery = supabase
-    .from('notification_logs')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(10)
 
   const { data: allProfiles } = isManagerView
     ? await profilesQuery
@@ -79,16 +84,26 @@ export default async function DashboardPage() {
         .select('id, full_name, email, role')
         .eq('id', user.id)
 
-  const { data: tasks } = isManagerView
-    ? await tasksQuery.order('created_at', { ascending: false })
-    : await supabase
-        .from('tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+  let baseTasks = isManagerView
+    ? supabase.from('tasks').select('*')
+    : supabase.from('tasks').select('*').eq('user_id', user.id)
+
+  if (isManagerView && selectedUserId !== 'all') {
+    baseTasks = baseTasks.eq('user_id', selectedUserId)
+  }
+
+  if (selectedStatus !== 'all') {
+    baseTasks = baseTasks.eq('status', selectedStatus)
+  }
+
+  const { data: tasks } = await baseTasks.order('created_at', { ascending: false })
 
   const { data: logs } = isManagerView
-    ? await logsQuery
+    ? await supabase
+        .from('notification_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10)
     : await supabase
         .from('notification_logs')
         .select('*')
@@ -152,6 +167,21 @@ export default async function DashboardPage() {
   const overdueRanking = [...analytics].sort((a, b) => b.overdue - a.overdue)
   const doneRanking = [...analytics].sort((a, b) => b.done - a.done)
 
+  function buildDashboardUrl(userValue: string, statusValue: string) {
+    const search = new URLSearchParams()
+
+    if (userValue !== 'all') {
+      search.set('user', userValue)
+    }
+
+    if (statusValue !== 'all') {
+      search.set('status', statusValue)
+    }
+
+    const query = search.toString()
+    return query ? `/dashboard?${query}` : '/dashboard'
+  }
+
   return (
     <main className="min-h-screen p-6">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -168,6 +198,69 @@ export default async function DashboardPage() {
 
           <LogoutButton />
         </div>
+
+        {isManagerView && (
+          <div className="rounded-2xl border p-6 space-y-4">
+            <h2 className="text-xl font-semibold">Filtros de gestão</h2>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <p className="text-sm text-zinc-500">Filtrar por usuário</p>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={buildDashboardUrl('all', selectedStatus)}
+                    className={`rounded-lg px-3 py-2 text-sm border ${
+                      selectedUserId === 'all'
+                        ? 'bg-black text-white border-black'
+                        : 'bg-white text-black'
+                    }`}
+                  >
+                    Todos
+                  </Link>
+
+                  {(allProfiles || []).map((person) => (
+                    <Link
+                      key={person.id}
+                      href={buildDashboardUrl(person.id, selectedStatus)}
+                      className={`rounded-lg px-3 py-2 text-sm border ${
+                        selectedUserId === person.id
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white text-black'
+                      }`}
+                    >
+                      {person.full_name || person.email}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-zinc-500">Filtrar por status</p>
+                <div className="flex flex-wrap gap-2">
+                  {['all', 'pending', 'overdue', 'done'].map((status) => (
+                    <Link
+                      key={status}
+                      href={buildDashboardUrl(selectedUserId, status)}
+                      className={`rounded-lg px-3 py-2 text-sm border ${
+                        selectedStatus === status
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white text-black'
+                      }`}
+                    >
+                      {status === 'all'
+                        ? 'Todos'
+                        : status === 'pending'
+                        ? 'Pendentes'
+                        : status === 'overdue'
+                        ? 'Atrasadas'
+                        : 'Concluídas'}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl border p-4">
