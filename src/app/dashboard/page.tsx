@@ -41,6 +41,7 @@ function minutesToDays(minutes: number | null) {
 type SearchParams = Promise<{
   user?: string
   status?: string
+  period?: string
 }>
 
 export default async function DashboardPage({
@@ -51,6 +52,7 @@ export default async function DashboardPage({
   const params = await searchParams
   const selectedUserId = params.user || 'all'
   const selectedStatus = params.status || 'all'
+  const selectedPeriod = params.period || 'all'
 
   const supabase = await createClient()
 
@@ -63,6 +65,27 @@ export default async function DashboardPage({
   }
 
   const today = getTodayInSaoPaulo()
+
+  function getDateDaysAgo(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+let startDate: string | null = null
+
+if (selectedPeriod === '7d') {
+  startDate = getDateDaysAgo(7)
+} else if (selectedPeriod === '30d') {
+  startDate = getDateDaysAgo(30)
+} else if (selectedPeriod === 'today') {
+  startDate = today
+}
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -94,6 +117,10 @@ export default async function DashboardPage({
 
   if (selectedStatus !== 'all') {
     baseTasks = baseTasks.eq('status', selectedStatus)
+  }
+
+  if (startDate) {
+  baseTasks = baseTasks.gte('created_at', startDate)
   }
 
   const { data: tasks } = await baseTasks.order('created_at', { ascending: false })
@@ -167,7 +194,11 @@ export default async function DashboardPage({
   const overdueRanking = [...analytics].sort((a, b) => b.overdue - a.overdue)
   const doneRanking = [...analytics].sort((a, b) => b.done - a.done)
 
-  function buildDashboardUrl(userValue: string, statusValue: string) {
+  function buildDashboardUrl(
+    userValue: string,
+    statusValue: string,
+    periodValue: string
+  ) {
     const search = new URLSearchParams()
 
     if (userValue !== 'all') {
@@ -176,6 +207,10 @@ export default async function DashboardPage({
 
     if (statusValue !== 'all') {
       search.set('status', statusValue)
+    }
+
+    if (periodValue !== 'all') {
+      search.set('period', periodValue)
     }
 
     const query = search.toString()
@@ -203,12 +238,12 @@ export default async function DashboardPage({
           <div className="rounded-2xl border p-6 space-y-4">
             <h2 className="text-xl font-semibold">Filtros de gestão</h2>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <p className="text-sm text-zinc-500">Filtrar por usuário</p>
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    href={buildDashboardUrl('all', selectedStatus)}
+                    href={buildDashboardUrl('all', selectedStatus, selectedPeriod)}
                     className={`rounded-lg px-3 py-2 text-sm border ${
                       selectedUserId === 'all'
                         ? 'bg-black text-white border-black'
@@ -221,7 +256,7 @@ export default async function DashboardPage({
                   {(allProfiles || []).map((person) => (
                     <Link
                       key={person.id}
-                      href={buildDashboardUrl(person.id, selectedStatus)}
+                      href={buildDashboardUrl(person.id, selectedStatus, selectedPeriod)}
                       className={`rounded-lg px-3 py-2 text-sm border ${
                         selectedUserId === person.id
                           ? 'bg-black text-white border-black'
@@ -240,7 +275,7 @@ export default async function DashboardPage({
                   {['all', 'pending', 'overdue', 'done'].map((status) => (
                     <Link
                       key={status}
-                      href={buildDashboardUrl(selectedUserId, status)}
+                      href={buildDashboardUrl(selectedUserId, status, selectedPeriod)}
                       className={`rounded-lg px-3 py-2 text-sm border ${
                         selectedStatus === status
                           ? 'bg-black text-white border-black'
@@ -254,6 +289,30 @@ export default async function DashboardPage({
                         : status === 'overdue'
                         ? 'Atrasadas'
                         : 'Concluídas'}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-zinc-500">Período</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'all', label: 'Tudo' },
+                    { value: 'today', label: 'Hoje' },
+                    { value: '7d', label: '7 dias' },
+                    { value: '30d', label: '30 dias' },
+                  ].map((period) => (
+                    <Link
+                      key={period.value}
+                      href={buildDashboardUrl(selectedUserId, selectedStatus, period.value)}
+                      className={`rounded-lg px-3 py-2 text-sm border ${
+                        selectedPeriod === period.value
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white text-black'
+                      }`}
+                    >
+                      {period.label}
                     </Link>
                   ))}
                 </div>
