@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from '@/components/logout-button'
 import RunAlertsButton from '@/components/run-alerts-button'
+import ExportCsvButton from '@/components/export-csv-button'
 import DashboardCharts from '@/components/dashboard-charts'
 import Link from 'next/link'
 
@@ -360,16 +361,22 @@ const statusChartData = [
         </div>
 
         <div className="rounded-2xl border p-6 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">Resumo do dia</h2>
-              <p className="text-sm text-zinc-500">
-                Hoje: {today}
-              </p>
-            </div>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">Resumo do dia</h2>
+            <p className="text-sm text-zinc-500">
+              Hoje: {today}
+            </p>
+          </div>
 
+          <div className="flex gap-2">
+            <ExportCsvButton
+              userId={selectedUserId}
+              status={selectedStatus}
+            />
             <RunAlertsButton />
           </div>
+        </div>
 
           {dueTodayTasks.length === 0 && alertTodayTasks.length === 0 ? (
             <p className="text-zinc-600">
