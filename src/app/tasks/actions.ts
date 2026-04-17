@@ -33,6 +33,7 @@ export async function createTask(formData: FormData) {
   const recurrence = String(formData.get('recurrence') || 'none')
   const dayOfMonth = Number(formData.get('day_of_month') || 0)
   const remindDaysBefore = Number(formData.get('remind_days_before') || 0)
+  const dueTime = String(formData.get('due_time') || '')
 
   const remindOffsetMinutes =
     remindDaysBefore > 0 ? remindDaysBefore * 24 * 60 : 0
@@ -136,6 +137,14 @@ export async function deleteTask(taskId: string) {
 export async function updateTask(taskId: string, formData: FormData) {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Usuário não autenticado.')
+  }
+
   const title = String(formData.get('title') || '')
   const description = String(formData.get('description') || '')
   const dueDate = String(formData.get('due_date') || '')
@@ -166,18 +175,12 @@ export async function updateTask(taskId: string, formData: FormData) {
     throw new Error(error.message)
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (user) {
-    await supabase.from('activity_logs').insert({
-      user_id: user.id,
-      task_id: taskId,
-      action: 'update',
-      description: 'Atualizou tarefa',
-    })
-  }
+  await supabase.from('activity_logs').insert({
+    user_id: user.id,
+    task_id: taskId,
+    action: 'update',
+    description: 'Atualizou tarefa',
+  })
 
   revalidatePath('/tasks')
   revalidatePath('/dashboard')
