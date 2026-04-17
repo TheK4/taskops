@@ -93,21 +93,33 @@ export async function GET(request: NextRequest) {
     let y = height - margin
 
     function drawText(
-      text: string,
-      x: number,
-      size = 11,
-      bold = false,
-      color = rgb(0, 0, 0)
+    text: string,
+    x: number,
+    size = 11,
+    bold = false,
+    color = rgb(0, 0, 0)
     ) {
-      const usedFont = bold ? fontBold : font
-      page.drawText(text, {
+    const usedFont = bold ? fontBold : font
+
+    page.drawText(text, {
         x,
         y,
         size,
         font: usedFont,
         color,
-      })
-      y -= size + 6
+    })
+
+    y -= size + 8
+    }
+
+    function drawDivider() {
+    page.drawLine({
+        start: { x: margin, y },
+        end: { x: width - margin, y },
+        thickness: 1,
+        color: rgb(0.85, 0.85, 0.85),
+    })
+    y -= 12
     }
 
     function ensureSpace(minSpace = 60) {
@@ -117,23 +129,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    drawText('TaskOps - Relatório Operacional', margin, 20, true)
-    y -= 6
+    drawText('TaskOps', margin, 22, true)
+    drawText('Relatório Operacional', margin, 14, false, rgb(0.3, 0.3, 0.3))
 
-    drawText(`Período: ${formatPeriodLabel(period)}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
-    drawText(`Status filtrado: ${status === 'all' ? 'Todos' : status}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
-    drawText(`Usuário filtrado: ${userId === 'all' ? 'Todos' : getUserLabel(userId)}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
+    drawDivider()
+
+    drawText('Filtros aplicados', margin, 13, true)
+
+    drawText(`Período: ${formatPeriodLabel(period)}`, margin)
+    drawText(`Status: ${status === 'all' ? 'Todos' : status}`, margin)
+    drawText(`Usuário: ${userId === 'all' ? 'Todos' : getUserLabel(userId)}`, margin)
     drawText(`Emitido em: ${new Date().toLocaleString('pt-BR')}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
 
-    y -= 10
-    drawText('Resumo', margin, 15, true)
-    drawText(`Total de tarefas: ${totalTasks}`, margin, 11)
-    drawText(`Pendentes: ${pendingTasks}`, margin, 11)
-    drawText(`Atrasadas: ${overdueTasks}`, margin, 11)
-    drawText(`Concluídas: ${doneTasks}`, margin, 11)
+    drawDivider()
 
     y -= 10
-    drawText('Tarefas', margin, 15, true)
+    drawText('Resumo geral', margin, 15, true)
+
+    drawText(`Total de tarefas: ${totalTasks}`, margin, 12)
+    drawText(`Pendentes: ${pendingTasks}`, margin, 12, false, rgb(0.8, 0.6, 0))
+    drawText(`Atrasadas: ${overdueTasks}`, margin, 12, false, rgb(0.8, 0, 0))
+    drawText(`Concluídas: ${doneTasks}`, margin, 12, false, rgb(0, 0.6, 0))
+
+    drawDivider()
+
+    y -= 10
+    drawText('Lista de tarefas', margin, 15, true)
+    drawDivider()
 
     if (!tasks || tasks.length === 0) {
       drawText('Nenhuma tarefa encontrada para os filtros selecionados.', margin, 11)
@@ -142,13 +164,18 @@ export async function GET(request: NextRequest) {
         const task = tasks[i]
         ensureSpace(120)
 
-        drawText(`${i + 1}. ${task.title}`, margin, 12, true)
-        drawText(`Responsável: ${getUserLabel(task.user_id)}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
-        drawText(`Status: ${task.status}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
-        drawText(`Data: ${task.start_date}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
-        drawText(`Recorrência: ${task.recurrence_type}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
-        drawText(`Descrição: ${task.description || '-'}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
-        y -= 8
+    drawText(`${i + 1}. ${task.title}`, margin, 13, true)
+
+    drawText(`Responsável: ${getUserLabel(task.user_id)}`, margin, 10)
+    drawText(`Status: ${task.status}`, margin, 10)
+    drawText(`Data: ${task.start_date}`, margin, 10)
+    drawText(`Recorrência: ${task.recurrence_type}`, margin, 10)
+
+    if (task.description) {
+    drawText(`Descrição: ${task.description}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
+    }
+
+    drawDivider()
       }
     }
 
