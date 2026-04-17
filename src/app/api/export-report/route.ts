@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
@@ -23,9 +24,6 @@ function formatPeriodLabel(period: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const PDFDocumentModule = await import('pdfkit')
-    const PDFDocument = PDFDocumentModule.default
-
     const supabase = createAdminClient()
 
     const searchParams = request.nextUrl.searchParams
@@ -85,77 +83,78 @@ export async function GET(request: NextRequest) {
     const overdueTasks = (tasks || []).filter((task) => task.status === 'overdue').length
     const doneTasks = (tasks || []).filter((task) => task.status === 'done').length
 
-    const doc = new PDFDocument({
-      margin: 50,
-      size: 'A4',
-    })
+    const pdfDoc = await PDFDocument.create()
+    let page = pdfDoc.addPage([595.28, 841.89]) // A4
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-    const chunks: Buffer[] = []
+    const { width, height } = page.getSize()
+    const margin = 50
+    let y = height - margin
 
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk))
-
-    const pdfReady = new Promise<Buffer>((resolve, reject) => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)))
-      doc.on('error', reject)
-    })
-
-    doc.fontSize(22).text('TaskOps - Relatório Operacional', { align: 'left' })
-    doc.moveDown(0.5)
-
-    doc
-      .fontSize(10)
-      .fillColor('#666666')
-      .text(`Período: ${formatPeriodLabel(period)}`)
-    doc.text(`Status filtrado: ${status === 'all' ? 'Todos' : status}`)
-    doc.text(`Usuário filtrado: ${userId === 'all' ? 'Todos' : getUserLabel(userId)}`)
-    doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`)
-
-    doc.moveDown(1)
-    doc.fillColor('#000000')
-    doc.fontSize(16).text('Resumo')
-    doc.moveDown(0.5)
-
-    doc.fontSize(11).text(`Total de tarefas: ${totalTasks}`)
-    doc.text(`Pendentes: ${pendingTasks}`)
-    doc.text(`Atrasadas: ${overdueTasks}`)
-    doc.text(`Concluídas: ${doneTasks}`)
-
-    doc.moveDown(1)
-    doc.fontSize(16).text('Tarefas')
-    doc.moveDown(0.5)
-
-    if (!tasks || tasks.length === 0) {
-      doc.fontSize(11).text('Nenhuma tarefa encontrada para os filtros selecionados.')
-    } else {
-      tasks.slice(0, 40).forEach((task, index) => {
-        if (doc.y > 720) {
-          doc.addPage()
-        }
-
-        doc
-          .fontSize(12)
-          .fillColor('#000000')
-          .text(`${index + 1}. ${task.title}`)
-
-        doc
-          .fontSize(10)
-          .fillColor('#555555')
-          .text(`Responsável: ${getUserLabel(task.user_id)}`)
-        doc.text(`Status: ${task.status}`)
-        doc.text(`Data: ${task.start_date}`)
-        doc.text(`Recorrência: ${task.recurrence_type}`)
-        doc.text(`Descrição: ${task.description || '-'}`)
-
-        doc.moveDown(0.8)
+    function drawText(
+      text: string,
+      x: number,
+      size = 11,
+      bold = false,
+      color = rgb(0, 0, 0)
+    ) {
+      const usedFont = bold ? fontBold : font
+      page.drawText(text, {
+        x,
+        y,
+        size,
+        font: usedFont,
+        color,
       })
+      y -= size + 6
     }
 
-    doc.end()
+    function ensureSpace(minSpace = 60) {
+      if (y < minSpace) {
+        page = pdfDoc.addPage([595.28, 841.89])
+        y = height - margin
+      }
+    }
 
-    const pdfBuffer = await pdfReady
-    const pdfBytes = new Uint8Array(pdfBuffer)
+    drawText('TaskOps - Relatório Operacional', margin, 20, true)
+    y -= 6
 
-    return new NextResponse(pdfBytes, {
+    drawText(`Período: ${formatPeriodLabel(period)}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
+    drawText(`Status filtrado: ${status === 'all' ? 'Todos' : status}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
+    drawText(`Usuário filtrado: ${userId === 'all' ? 'Todos' : getUserLabel(userId)}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
+    drawText(`Emitido em: ${new Date().toLocaleString('pt-BR')}`, margin, 10, false, rgb(0.4, 0.4, 0.4))
+
+    y -= 10
+    drawText('Resumo', margin, 15, true)
+    drawText(`Total de tarefas: ${totalTasks}`, margin, 11)
+    drawText(`Pendentes: ${pendingTasks}`, margin, 11)
+    drawText(`Atrasadas: ${overdueTasks}`, margin, 11)
+    drawText(`Concluídas: ${doneTasks}`, margin, 11)
+
+    y -= 10
+    drawText('Tarefas', margin, 15, true)
+
+    if (!tasks || tasks.length === 0) {
+      drawText('Nenhuma tarefa encontrada para os filtros selecionados.', margin, 11)
+    } else {
+      for (let i = 0; i < Math.min(tasks.length, 40); i++) {
+        const task = tasks[i]
+        ensureSpace(120)
+
+        drawText(`${i + 1}. ${task.title}`, margin, 12, true)
+        drawText(`Responsável: ${getUserLabel(task.user_id)}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
+        drawText(`Status: ${task.status}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
+        drawText(`Data: ${task.start_date}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
+        drawText(`Recorrência: ${task.recurrence_type}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
+        drawText(`Descrição: ${task.description || '-'}`, margin, 10, false, rgb(0.35, 0.35, 0.35))
+        y -= 8
+      }
+    }
+
+    const pdfBytes = await pdfDoc.save()
+
+    return new NextResponse(new Uint8Array(pdfBytes), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
