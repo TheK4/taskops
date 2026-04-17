@@ -1,17 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+function getDateDaysAgo(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
 export async function GET(request: NextRequest) {
   const supabase = createAdminClient()
 
   const searchParams = request.nextUrl.searchParams
   const userId = searchParams.get('user') || 'all'
   const status = searchParams.get('status') || 'all'
+  const period = searchParams.get('period') || 'all'
 
   let query = supabase
     .from('tasks')
     .select('*')
     .order('created_at', { ascending: false })
+
+    let startDate: string | null = null
+
+    if (period === 'today') {
+      startDate = getDateDaysAgo(0)
+    } else if (period === '7d') {
+      startDate = getDateDaysAgo(7)
+    } else if (period === '30d') {
+      startDate = getDateDaysAgo(30)
+    }
 
   if (userId !== 'all') {
     query = query.eq('user_id', userId)
@@ -19,6 +41,10 @@ export async function GET(request: NextRequest) {
 
   if (status !== 'all') {
     query = query.eq('status', status)
+  }
+
+  if (startDate) {
+    query = query.gte('created_at', startDate)
   }
 
   const { data: tasks, error } = await query

@@ -373,6 +373,7 @@ const statusChartData = [
             <ExportCsvButton
               userId={selectedUserId}
               status={selectedStatus}
+              period={selectedPeriod}
             />
             <RunAlertsButton />
           </div>

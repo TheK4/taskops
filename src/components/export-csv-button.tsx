@@ -3,9 +3,10 @@
 type Props = {
   userId: string
   status: string
+  period: string
 }
 
-export default function ExportCsvButton({ userId, status }: Props) {
+export default function ExportCsvButton({ userId, status, period }: Props) {
   function handleExport() {
     const params = new URLSearchParams()
 
@@ -15,6 +16,10 @@ export default function ExportCsvButton({ userId, status }: Props) {
 
     if (status && status !== 'all') {
       params.set('status', status)
+    }
+
+    if (period && period !== 'all') {
+      params.set('period', period)
     }
 
     const query = params.toString()
