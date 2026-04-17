@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from '@/components/logout-button'
 import RunAlertsButton from '@/components/run-alerts-button'
+import DashboardCharts from '@/components/dashboard-charts'
 import Link from 'next/link'
 
 const TZ = 'America/Sao_Paulo'
@@ -193,6 +194,21 @@ if (selectedPeriod === '7d') {
   const totalRanking = [...analytics].sort((a, b) => b.total - a.total)
   const overdueRanking = [...analytics].sort((a, b) => b.overdue - a.overdue)
   const doneRanking = [...analytics].sort((a, b) => b.done - a.done)
+
+  const userChartData = analytics.map((item) => ({
+  id: item.id,
+  name: item.name.length > 12 ? `${item.name.slice(0, 12)}...` : item.name,
+  total: item.total,
+  pending: item.pending,
+  overdue: item.overdue,
+  done: item.done,
+}))
+
+const statusChartData = [
+  { name: 'Pendentes', value: pendingTasksCount },
+  { name: 'Atrasadas', value: overdueTasksCount },
+  { name: 'Concluídas', value: doneTasksCount },
+]
 
   function buildDashboardUrl(
     userValue: string,
@@ -402,6 +418,13 @@ if (selectedPeriod === '7d') {
             )}
           </div>
         </div>
+
+        {isManagerView && (
+          <DashboardCharts
+            userAnalytics={userChartData}
+            statusAnalytics={statusChartData}
+          />
+        )}
 
         {isManagerView && (
           <div className="grid gap-4 md:grid-cols-3">
