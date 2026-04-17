@@ -74,3 +74,41 @@ export async function updateUserRole(userId: string, role: string) {
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/team')
 }
+
+export async function markNotificationsAsRead() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Usuário não autenticado.')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isManagerView =
+    profile?.role === 'admin' || profile?.role === 'manager'
+
+  let query = supabase
+    .from('notification_logs')
+    .update({ is_read: true })
+    .eq('is_read', false)
+
+  if (!isManagerView) {
+    query = query.eq('user_id', user.id)
+  }
+
+  const { error } = await query
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/dashboard')
+}

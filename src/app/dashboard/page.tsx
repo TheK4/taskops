@@ -142,12 +142,17 @@ if (selectedPeriod === '7d') {
         .order('created_at', { ascending: false })
         .limit(10)
 
-  const recentNotifications = (logs || []).map((log) => ({
-    id: log.id,
-    message: log.message,
-    channel: log.channel,
-    status: log.status,
-  }))
+const recentNotifications = (logs || []).map((log) => ({
+  id: log.id,
+  message: log.message,
+  channel: log.channel,
+  status: log.status,
+  is_read: log.is_read ?? false,
+}))
+
+const unreadNotifications = recentNotifications.filter(
+  (notification) => !notification.is_read
+)
 
   const { data: activityLogs } = isManagerView
     ? await supabase
@@ -258,7 +263,7 @@ const statusChartData = [
           </div>
 
   <div className="flex items-center gap-3">
-    <NotificationBell notifications={recentNotifications} />
+    <NotificationBell notifications={unreadNotifications} />
     <LogoutButton />
   </div>
 </div>
@@ -564,12 +569,12 @@ const statusChartData = [
             <div className="space-y-3">
               {recentNotifications.slice(0, 5).map((notification) => (
                 <div key={notification.id} className="rounded-xl border p-4">
-                <p className="font-medium">{notification.message}</p>
-                <p className="text-sm text-zinc-500 mt-1">
-                  Canal: {notification.channel} • Status: {notification.status}
-                </p>
-              </div>
-          ))}
+                  <p className="font-medium">{notification.message}</p>
+                  <p className="text-sm text-zinc-500 mt-1">
+                    Canal: {notification.channel} • Status: {notification.status} • {notification.is_read ? 'Lida' : 'Não lida'}
+                  </p>
+                </div>
+              ))}
         </div>
       ) : (
         <p className="text-zinc-600">

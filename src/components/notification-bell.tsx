@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { markNotificationsAsRead } from '@/app/dashboard/actions'
+import { useRouter } from 'next/navigation'
 
 type NotificationItem = {
   id: string
   message: string
   channel: string
   status: string
+  is_read?: boolean
 }
 
 type Props = {
@@ -15,7 +18,9 @@ type Props = {
 
 export default function NotificationBell({ notifications }: Props) {
   const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
 
   const count = notifications.length
 
@@ -34,6 +39,17 @@ export default function NotificationBell({ notifications }: Props) {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
+
+  function handleMarkAllAsRead() {
+    startTransition(async () => {
+      try {
+        await markNotificationsAsRead()
+        router.refresh()
+      } catch (error) {
+        console.error('Erro ao marcar notificações como lidas:', error)
+      }
+    })
+  }
 
   return (
     <div className="relative" ref={containerRef}>
@@ -58,13 +74,26 @@ export default function NotificationBell({ notifications }: Props) {
 
       {open && (
         <div className="absolute right-0 mt-2 w-96 max-w-[90vw] rounded-2xl border bg-white shadow-lg z-50">
-          <div className="border-b px-4 py-3">
-            <p className="font-semibold">Notificações recentes</p>
-            <p className="text-xs text-zinc-500">
-              {count > 0
-                ? `${count} notificação(ões) disponível(is)`
-                : 'Nenhuma notificação'}
-            </p>
+          <div className="border-b px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">Notificações recentes</p>
+              <p className="text-xs text-zinc-500">
+                {count > 0
+                  ? `${count} não lida(s)`
+                  : 'Nenhuma notificação não lida'}
+              </p>
+            </div>
+
+            {count > 0 && (
+              <button
+                type="button"
+                onClick={handleMarkAllAsRead}
+                disabled={isPending}
+                className="rounded-lg border px-3 py-2 text-xs"
+              >
+                {isPending ? 'Salvando...' : 'Marcar lidas'}
+              </button>
+            )}
           </div>
 
           <div className="max-h-96 overflow-y-auto p-3 space-y-3">
