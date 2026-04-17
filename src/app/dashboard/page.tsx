@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from '@/components/logout-button'
 import RunAlertsButton from '@/components/run-alerts-button'
+import { updateDailySummarySettings } from '@/app/dashboard/actions'
 import ExportCsvButton from '@/components/export-csv-button'
 import ExportPdfButton from '@/components/export-pdf-button'
 import DashboardCharts from '@/components/dashboard-charts'
@@ -354,6 +355,43 @@ const statusChartData = [
             </div>
           </div>
         )}
+
+        <div className="rounded-2xl border p-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold">Preferências de resumo diário</h2>
+            <p className="text-sm text-zinc-500">
+              Configure o envio automático do resumo das suas tarefas por email.
+            </p>
+          </div>
+
+          <form
+            action={updateDailySummarySettings}
+            className="grid gap-4 md:grid-cols-3 md:items-end"
+          >
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="daily_summary_enabled"
+                defaultChecked={profile?.daily_summary_enabled ?? true}
+              />
+              <span className="text-sm">Receber resumo diário</span>
+            </label>
+
+            <div className="space-y-2">
+              <p className="text-sm text-zinc-500">Horário do resumo</p>
+              <input
+                type="time"
+                name="daily_summary_time"
+                defaultValue={profile?.daily_summary_time?.slice(0, 5) || '08:00'}
+                className="w-full border px-3 py-2 rounded"
+              />
+            </div>
+
+            <button className="rounded-xl border px-4 py-2">
+              Salvar preferência
+            </button>
+          </form>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl border p-4">

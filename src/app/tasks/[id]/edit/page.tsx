@@ -75,6 +75,13 @@ export default async function EditTaskPage({ params }: Props) {
             className="w-full border px-3 py-2 rounded"
           />
 
+          <input
+            type="time"
+            name="due_time"
+            defaultValue={task.due_time || ''}
+            className="w-full border px-3 py-2 rounded"
+          />
+
           <select
             name="recurrence"
             defaultValue={task.recurrence_type}

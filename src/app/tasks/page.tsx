@@ -262,6 +262,12 @@ export default async function TasksPage({
             className="w-full border px-3 py-2 rounded"
           />
 
+          <input
+            type="time"
+            name="due_time"
+            className="w-full border px-3 py-2 rounded"
+          />
+
           <select name="recurrence" className="w-full border px-3 py-2 rounded">
             <option value="none">Sem recorrência</option>
             <option value="daily">Diária</option>
@@ -352,7 +358,9 @@ export default async function TasksPage({
                   <p className="text-sm text-zinc-600">{task.description}</p>
 
                   <div className="mt-1 flex flex-wrap gap-3 text-xs text-zinc-500">
-                    <span>Data: {task.start_date}</span>
+                    <span>
+                      Data: {task.start_date}{task.due_time ? ` às ${task.due_time}` : ''}
+                    </span>
                     <span>
                       Recorrência:{' '}
                       {task.recurrence_type === 'none'

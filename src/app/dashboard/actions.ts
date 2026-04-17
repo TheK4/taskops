@@ -112,3 +112,32 @@ export async function markNotificationsAsRead() {
 
   revalidatePath('/dashboard')
 }
+
+export async function updateDailySummarySettings(formData: FormData) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Usuário não autenticado.')
+  }
+
+  const dailySummaryEnabled = formData.get('daily_summary_enabled') === 'on'
+  const dailySummaryTime = String(formData.get('daily_summary_time') || '08:00')
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      daily_summary_enabled: dailySummaryEnabled,
+      daily_summary_time: dailySummaryTime,
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/dashboard')
+}

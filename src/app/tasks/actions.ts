@@ -38,17 +38,18 @@ export async function createTask(formData: FormData) {
     remindDaysBefore > 0 ? remindDaysBefore * 24 * 60 : 0
 
   const { data: insertedTask, error } = await supabase
-    .from('tasks')
-    .insert({
-      user_id: targetUserId,
-      title,
-      description,
-      start_date: dueDate,
-      recurrence_type: recurrence,
-      recurrence_day_of_month: dayOfMonth || null,
-      remind_offset_minutes: remindOffsetMinutes,
-      status: 'pending',
-    })
+  .from('tasks')
+  .insert({
+    user_id: targetUserId,
+    title,
+    description,
+    start_date: dueDate,
+    due_time: dueTime || null,
+    recurrence_type: recurrence,
+    recurrence_day_of_month: dayOfMonth || null,
+    remind_offset_minutes: remindOffsetMinutes,
+    status: 'pending',
+  } as any)
     .select('id')
     .single()
 
@@ -142,6 +143,7 @@ export async function updateTask(taskId: string, formData: FormData) {
   const dayOfMonth = Number(formData.get('day_of_month') || 0)
   const remindDaysBefore = Number(formData.get('remind_days_before') || 0)
   const status = String(formData.get('status') || 'pending')
+  const dueTime = String(formData.get('due_time') || '')
 
   const remindOffsetMinutes =
     remindDaysBefore > 0 ? remindDaysBefore * 24 * 60 : 0
@@ -152,6 +154,7 @@ export async function updateTask(taskId: string, formData: FormData) {
       title,
       description,
       start_date: dueDate,
+      due_time: dueTime || null,
       recurrence_type: recurrence,
       recurrence_day_of_month: dayOfMonth || null,
       remind_offset_minutes: remindOffsetMinutes,
