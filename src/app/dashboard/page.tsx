@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import LogoutButton from '@/components/logout-button'
 import RunAlertsButton from '@/components/run-alerts-button'
 import ExportCsvButton from '@/components/export-csv-button'
+import ExportPdfButton from '@/components/export-pdf-button'
 import DashboardCharts from '@/components/dashboard-charts'
 import Link from 'next/link'
 
@@ -371,6 +372,11 @@ const statusChartData = [
 
           <div className="flex gap-2">
             <ExportCsvButton
+              userId={selectedUserId}
+              status={selectedStatus}
+              period={selectedPeriod}
+            />
+            <ExportPdfButton
               userId={selectedUserId}
               status={selectedStatus}
               period={selectedPeriod}
