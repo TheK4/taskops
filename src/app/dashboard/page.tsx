@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from '@/components/logout-button'
 import RunAlertsButton from '@/components/run-alerts-button'
+import RunDailySummaryButton from '@/components/run-daily-summary-button'
 import { updateDailySummarySettings } from '@/app/dashboard/actions'
 import ExportCsvButton from '@/components/export-csv-button'
 import ExportPdfButton from '@/components/export-pdf-button'
@@ -435,6 +436,7 @@ const statusChartData = [
               status={selectedStatus}
               period={selectedPeriod}
             />
+            <RunDailySummaryButton />
             <RunAlertsButton />
           </div>
         </div>
