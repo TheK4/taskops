@@ -36,6 +36,18 @@ function getCurrentTimeInSaoPauloHHMM() {
   return `${hour}:${minute}`
 }
 
+function hhmmToMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number)
+  return hour * 60 + minute
+}
+
+function isWithinSummaryWindow(summaryTime: string, nowHHMM: string, windowMinutes = 5) {
+  const summaryMinutes = hhmmToMinutes(summaryTime)
+  const nowMinutes = hhmmToMinutes(nowHHMM)
+
+  return nowMinutes >= summaryMinutes && nowMinutes <= summaryMinutes + windowMinutes
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -63,12 +75,27 @@ export async function GET(request: NextRequest) {
     const errors: string[] = []
 
     for (const profile of profiles || []) {
+      const scheduledFor = `${today}T00:00:00`
       if (!profile.email) continue
 
-      const summaryTime = profile.daily_summary_time?.slice(0, 5)
-      if (!summaryTime || summaryTime !== nowHHMM) {
-        continue
-      }
+const summaryTime = profile.daily_summary_time?.slice(0, 5)
+
+if (!summaryTime || !isWithinSummaryWindow(summaryTime, nowHHMM, 5)) {
+  continue
+}
+
+const { data: existingSummaryLog } = await supabase
+  .from('notification_logs')
+  .select('id')
+  .eq('user_id', profile.id)
+  .eq('channel', 'email')
+  .eq('scheduled_for', scheduledFor)
+  .eq('message', 'Resumo diário enviado')
+  .maybeSingle()
+
+if (existingSummaryLog) {
+  continue
+}
 
       const { data: tasks } = await supabase
         .from('tasks')
@@ -105,12 +132,22 @@ export async function GET(request: NextRequest) {
         `,
       })
 
-      if (emailError) {
-        errors.push(`${profile.email}: ${emailError.message}`)
-        continue
-      }
+if (emailError) {
+  errors.push(`${profile.email}: ${emailError.message}`)
+  continue
+}
 
-      sent += 1
+await supabase.from('notification_logs').insert({
+  user_id: profile.id,
+  task_id: null,
+  channel: 'email',
+  status: 'sent',
+  message: 'Resumo diário enviado',
+  scheduled_for: scheduledFor,
+  sent_at: new Date().toISOString(),
+})
+
+sent += 1
     }
 
     return NextResponse.json({
