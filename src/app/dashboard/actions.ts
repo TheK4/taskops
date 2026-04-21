@@ -174,3 +174,36 @@ export async function runDailySummaryManually() {
 
   return data
 }
+
+export async function runTaskTimeAlertsManually() {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL
+
+  if (!baseUrl) {
+    throw new Error('URL base do projeto não encontrada.')
+  }
+
+  const normalizedBaseUrl = baseUrl.startsWith('http')
+    ? baseUrl
+    : `https://${baseUrl}`
+
+  const response = await fetch(`${normalizedBaseUrl}/api/run-task-time-alerts`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    cache: 'no-store',
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data?.error || 'Erro ao executar alertas por horário.')
+  }
+
+  revalidatePath('/dashboard')
+
+  return data
+}

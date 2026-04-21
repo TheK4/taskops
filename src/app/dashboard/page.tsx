@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import LogoutButton from '@/components/logout-button'
 import RunAlertsButton from '@/components/run-alerts-button'
 import RunDailySummaryButton from '@/components/run-daily-summary-button'
+import RunTaskTimeAlertsButton from '@/components/run-task-time-alerts-button'
 import { updateDailySummarySettings } from '@/app/dashboard/actions'
 import ExportCsvButton from '@/components/export-csv-button'
 import ExportPdfButton from '@/components/export-pdf-button'
@@ -437,6 +438,7 @@ const statusChartData = [
               period={selectedPeriod}
             />
             <RunDailySummaryButton />
+            <RunTaskTimeAlertsButton />
             <RunAlertsButton />
           </div>
         </div>
