@@ -102,35 +102,82 @@ if (existingSummaryLog) {
         .select('*')
         .eq('user_id', profile.id)
         .in('status', ['pending', 'overdue'])
-        .eq('start_date', today)
+        .lte('start_date', today)
+        .order('start_date', { ascending: true })
         .order('due_time', { ascending: true })
 
-      const lines =
-        tasks && tasks.length > 0
-          ? tasks
+const overdueTasks =
+  (tasks || []).filter(
+    (task) => task.status === 'overdue' || task.start_date < today
+  )
+
+const todayTasks =
+  (tasks || []).filter((task) => task.start_date === today)
+
+const overdueLines =
+  overdueTasks.length > 0
+    ? overdueTasks
+        .map(
+          (task) =>
+            `<li><strong>${task.title}</strong> — ${task.start_date}${
+              task.due_time ? ` às ${task.due_time}` : ''
+            }</li>`
+        )
+        .join('')
+    : '<li>Nenhuma tarefa atrasada.</li>'
+
+      const todayLines =
+        todayTasks.length > 0
+          ? todayTasks
               .map(
                 (task) =>
-                  `<li><strong>${task.title}</strong> — ${task.start_date}${
+                  `<li><strong>${task.title}</strong> — hoje${
                     task.due_time ? ` às ${task.due_time}` : ''
                   } (${task.status})</li>`
               )
               .join('')
-          : '<li>Nenhuma tarefa pendente para hoje.</li>'
+          : '<li>Nenhuma tarefa para hoje.</li>'
 
-      const { error: emailError } = await resend.emails.send({
-        from: 'TaskOps <onboarding@resend.dev>',
-        to: 'talesaknauer@gmail.com',
-        subject: 'TaskOps: resumo diário das tarefas',
-        html: `
-          <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <h2>Bom dia${profile.full_name ? `, ${profile.full_name}` : ''}</h2>
-            <p>Segue o resumo das suas tarefas para hoje (${today}).</p>
-            <ul>${lines}</ul>
-            <hr />
-            <p>Enviado automaticamente pelo TaskOps.</p>
-          </div>
-        `,
-      })
+      const totalOpenTasks = (tasks || []).length
+        if (totalOpenTasks === 0) {
+          continue
+        }
+
+const { error: emailError } = await resend.emails.send({
+  from: 'TaskOps <onboarding@resend.dev>',
+  to: 'talesaknauer@gmail.com',
+  subject: 'TaskOps: resumo diário das tarefas',
+  html: `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+      <h2 style="margin-bottom: 8px;">Bom dia${profile.full_name ? `, ${profile.full_name}` : ''}</h2>
+
+      <p style="margin: 0 0 16px 0;">
+        Segue o resumo das suas tarefas em aberto para <strong>${today}</strong>.
+      </p>
+
+      <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
+        <p style="margin: 0; font-size: 14px;">
+          <strong>Total de tarefas em aberto:</strong> ${totalOpenTasks}
+        </p>
+      </div>
+
+      <h3 style="margin-bottom: 8px;">Tarefas atrasadas</h3>
+      <ul style="margin-top: 0; margin-bottom: 20px;">
+        ${overdueLines}
+      </ul>
+
+      <h3 style="margin-bottom: 8px;">Tarefas para hoje</h3>
+      <ul style="margin-top: 0; margin-bottom: 20px;">
+        ${todayLines}
+      </ul>
+
+      <hr />
+      <p style="font-size: 12px; color: #666;">
+        Enviado automaticamente pelo TaskOps.
+      </p>
+    </div>
+  `,
+})
 
 if (emailError) {
   errors.push(`${profile.email}: ${emailError.message}`)
